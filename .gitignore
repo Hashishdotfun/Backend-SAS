@@ -1,0 +1,26 @@
+# Rust build artifacts
+/target/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Database
+/data/
+*.db
+*.db-journal
+
+# Secrets & keys
+authority-keypair.json
+*.pem
+*.key
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Fly.io secrets (keep fly.toml but not secrets)

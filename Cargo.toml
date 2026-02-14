@@ -1,0 +1,49 @@
+[package]
+name = "hashish-backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Web framework
+actix-web = "4"
+actix-cors = "0.7"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# JWT
+jsonwebtoken = "9"
+
+# Database
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Configuration
+dotenvy = "0.15"
+
+# Error handling
+thiserror = "2"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# X.509 / ASN.1 for Android Key Attestation
+x509-parser = { version = "0.16", features = ["verify"] }
+asn1-rs = "0.6"
+base64 = "0.22"
+rand = "0.9"
+hex = "0.4"
+
+# Solana (for building attestation transactions)
+solana-sdk = "2.2"
+solana-client = "2.2"
+bs58 = "0.5"
+borsh = "1"
+bincode = "1"
