@@ -14,6 +14,8 @@ primary_region = 'cdg'
   RUST_LOG = 'info,hashish_backend=debug'
   SOLANA_RPC_URL = 'https://api.devnet.solana.com'
   PROGRAM_ID = 'Ai9XrxSUmDLNCXkoeoqnYuzPgN9F2PeF9WtLq9GyqER'
+  # Attestation checks are strict by default; set to true ONLY for local debugging
+  # SKIP_ATTESTATION_CHECKS = 'false'
 
 [http_service]
   internal_port = 8080

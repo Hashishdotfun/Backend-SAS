@@ -148,12 +148,30 @@ pub fn verify_attestation(
     let info = parse_key_attestation(attestation_ext.value, expected_challenge)?;
 
     // ── Step 6: Enforce security requirements ──
-    // In strict mode these would reject; for now we warn and continue
-    // so the test app can display all device info regardless.
+    // Strict mode is ON by default. Set SKIP_ATTESTATION_CHECKS=true to disable
+    // (only for local testing / debugging).
 
-    let strict = std::env::var("STRICT_ATTESTATION")
+    let skip_checks = std::env::var("SKIP_ATTESTATION_CHECKS")
         .map(|v| v == "true" || v == "1")
         .unwrap_or(false);
+    let strict = !skip_checks;
+
+    // Log all device info upfront so we can diagnose issues
+    tracing::info!(
+        brand = %info.brand,
+        model = %info.model,
+        manufacturer = %info.manufacturer,
+        product = %info.product,
+        attestation_security = %info.attestation_security_level,
+        keymaster_security = %info.keymaster_security_level,
+        boot_state = %info.verified_boot_state,
+        device_locked = info.device_locked,
+        app_package = ?info.app_package_name,
+        app_digests = ?info.app_signature_digests,
+        attestation_version = info.attestation_version,
+        strict = strict,
+        "Device attestation info"
+    );
 
     // 6a. Attestation security level must be TEE or StrongBox
     if info.attestation_security_level == SecurityLevel::Software {
@@ -169,22 +187,23 @@ pub fn verify_attestation(
         tracing::warn!("WARN: {msg}");
     }
 
-    // 6c. Verified boot state must be Verified (locked bootloader, untampered OS)
+    // 6c. Boot state & device locked — log-only (many Seekers have unlocked bootloader)
     if info.verified_boot_state != VerifiedBootState::Verified {
-        let msg = format!("Boot state is {} (need Verified = locked bootloader)", info.verified_boot_state);
-        if strict { return Err(format!("REJECTED: {msg}")); }
-        tracing::warn!("WARN: {msg}");
+        tracing::warn!("Boot state is {} (not Verified)", info.verified_boot_state);
     }
-
-    // 6d. Device must be locked
     if !info.device_locked {
-        let msg = "Device is unlocked (bootloader unlocked)";
-        if strict { return Err(format!("REJECTED: {msg}")); }
-        tracing::warn!("WARN: {msg}");
+        tracing::warn!("Device bootloader is unlocked");
     }
 
     // 6e. Brand must be solanamobile
-    if info.brand.to_lowercase() != "solanamobile" {
+    // Device properties (tags 710-716) require API 31+ with setDevicePropertiesAttestationIncluded.
+    // If the brand is empty, the device didn't provide properties — reject in strict mode
+    // because we can't verify it's a Seeker without the brand.
+    if info.brand.is_empty() {
+        let msg = "No brand in attestation (device properties missing) — cannot verify Seeker";
+        if strict { return Err(format!("REJECTED: {msg}")); }
+        tracing::warn!("WARN: {msg}");
+    } else if info.brand.to_lowercase() != "solanamobile" {
         let msg = format!("Brand is '{}' (need 'solanamobile')", info.brand);
         if strict { return Err(format!("REJECTED: {msg}")); }
         tracing::warn!("WARN: {msg}");
