@@ -7,6 +7,7 @@ pub struct Config {
     pub solana_rpc_url: String,
     pub authority_keypair_path: Option<String>,
     pub program_id: Option<String>,
+    pub attestation_rent_recipient: Option<String>,
     /// When true, only attestation verification endpoints are available (no Solana)
     pub attestation_only: bool,
 }
@@ -39,6 +40,7 @@ impl Config {
 
         let authority_keypair_path = std::env::var("AUTHORITY_KEYPAIR_PATH").ok();
         let program_id = std::env::var("PROGRAM_ID").ok();
+        let attestation_rent_recipient = std::env::var("ATTESTATION_RENT_RECIPIENT").ok();
 
         Ok(Config {
             host,
@@ -49,6 +51,7 @@ impl Config {
             solana_rpc_url,
             authority_keypair_path,
             program_id,
+            attestation_rent_recipient,
             attestation_only,
         })
     }

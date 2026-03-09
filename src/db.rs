@@ -29,6 +29,7 @@ impl Database {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 wallet_address TEXT NOT NULL,
                 attestation_pda TEXT NOT NULL,
+                rent_recipient TEXT,
                 verified_at TEXT NOT NULL,
                 last_seen TEXT NOT NULL,
                 UNIQUE(wallet_address, attestation_pda)
@@ -36,18 +37,47 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_wallet ON verified_devices(wallet_address);",
         )
         .map_err(|e| ApiError::Db(e.to_string()))?;
+
+        let has_rent_recipient = {
+            let mut stmt = conn
+                .prepare("PRAGMA table_info(verified_devices)")
+                .map_err(|e| ApiError::Db(e.to_string()))?;
+            let columns = stmt
+                .query_map([], |row| row.get::<_, String>(1))
+                .map_err(|e| ApiError::Db(e.to_string()))?;
+
+            let has_column = columns
+                .filter_map(Result::ok)
+                .any(|name| name == "rent_recipient");
+
+            has_column
+        };
+
+        if !has_rent_recipient {
+            conn.execute(
+                "ALTER TABLE verified_devices ADD COLUMN rent_recipient TEXT",
+                [],
+            )
+            .map_err(|e| ApiError::Db(e.to_string()))?;
+        }
+
         Ok(())
     }
 
-    pub fn upsert_device(&self, wallet: &str, attestation_pda: &str) -> Result<(), ApiError> {
+    pub fn upsert_device(
+        &self,
+        wallet: &str,
+        attestation_pda: &str,
+        rent_recipient: Option<&str>,
+    ) -> Result<(), ApiError> {
         let conn = self.conn.lock().unwrap();
         let now = chrono::Utc::now().to_rfc3339();
         conn.execute(
-            "INSERT INTO verified_devices (wallet_address, attestation_pda, verified_at, last_seen)
-             VALUES (?1, ?2, ?3, ?3)
+            "INSERT INTO verified_devices (wallet_address, attestation_pda, rent_recipient, verified_at, last_seen)
+             VALUES (?1, ?2, ?3, ?4, ?4)
              ON CONFLICT(wallet_address, attestation_pda)
-             DO UPDATE SET last_seen = ?3",
-            rusqlite::params![wallet, attestation_pda, now],
+             DO UPDATE SET rent_recipient = excluded.rent_recipient, last_seen = ?4",
+            rusqlite::params![wallet, attestation_pda, rent_recipient, now],
         )?;
         Ok(())
     }

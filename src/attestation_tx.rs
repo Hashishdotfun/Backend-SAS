@@ -35,6 +35,7 @@ pub fn build_attestation_tx(
     program_id: &Pubkey,
     authority_keypair: &Keypair,
     miner: &Pubkey,
+    rent_recipient: Option<&Pubkey>,
 ) -> Result<(String, Pubkey), String> {
     // Derive PDAs (attestation references Seeker pool)
     let (pow_config_pda, _pow_bump) =
@@ -56,6 +57,7 @@ pub fn build_attestation_tx(
         AccountMeta::new_readonly(authority_keypair.pubkey(), true),
         AccountMeta::new_readonly(pow_config_pda, false),
         AccountMeta::new(attestation_pda, false),
+        AccountMeta::new_readonly(*rent_recipient.unwrap_or(miner), false),
         AccountMeta::new_readonly(solana_sdk::system_program::id(), false),
     ];
 

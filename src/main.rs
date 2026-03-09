@@ -41,6 +41,8 @@ struct VerifyDeviceRequest {
     challenge: String,
     /// Wallet address (base58, to bind the attestation to)
     wallet_address: String,
+    /// Optional rent recipient requested by the app for later attestation cleanup.
+    rent_recipient: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -219,6 +221,7 @@ async fn verify_device(
     let challenge = body.challenge.clone();
     let wallet_address = body.wallet_address.clone();
     let cert_chain = body.certificate_chain.clone();
+    let requested_rent_recipient = body.rent_recipient.clone();
 
     // Check challenge exists and is fresh
     {
@@ -262,6 +265,16 @@ async fn verify_device(
                 let program_id = state_clone.program_id
                     .ok_or_else(|| ApiError::Internal("Program ID not configured".into()))?;
 
+                let rent_recipient = requested_rent_recipient
+                    .clone()
+                    .or_else(|| state_clone.config.attestation_rent_recipient.clone())
+                    .map(|value| {
+                        Pubkey::from_str(&value)
+                            .map(|pubkey| (value, pubkey))
+                            .map_err(|e| ApiError::InvalidRequest(format!("Invalid rent_recipient: {e}")))
+                    })
+                    .transpose()?;
+
                 // Reconstruct keypair and RPC client (Keypair is !Sync)
                 let authority = Keypair::try_from(authority_bytes.as_slice())
                     .map_err(|e| ApiError::Internal(format!("Keypair error: {e}")))?;
@@ -272,12 +285,17 @@ async fn verify_device(
                     &program_id,
                     &authority,
                     &miner_pubkey,
+                    rent_recipient.as_ref().map(|(_, pubkey)| pubkey),
                 )
                 .map_err(|e| ApiError::Internal(format!("Failed to build attestation tx: {e}")))?;
 
                 state_clone
                     .db
-                    .upsert_device(&wallet_address, &format!("hw:{}", device_info.model))?;
+                    .upsert_device(
+                        &wallet_address,
+                        &attestation_pda.to_string(),
+                        rent_recipient.as_ref().map(|(value, _)| value.as_str()),
+                    )?;
 
                 tracing::info!(
                     wallet = %wallet_address,
@@ -287,6 +305,7 @@ async fn verify_device(
                     security_level = %device_info.attestation_security_level,
                     boot_state = %device_info.verified_boot_state,
                     attestation_pda = %attestation_pda,
+                    rent_recipient = ?rent_recipient.as_ref().map(|(value, _)| value),
                     "Seeker verified → attestation tx built"
                 );
 
